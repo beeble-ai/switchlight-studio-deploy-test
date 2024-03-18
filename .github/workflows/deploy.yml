@@ -14,27 +14,21 @@ jobs:
       uses: actions/github-script@v5
       with:
         script: |
-          const { data: releases } = await github.rest.repos.listReleases({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-          });
-          const draftRelease = releases.find(release => release.draft);
-          if (!draftRelease) {
-            throw new Error("No draft release found");
-          }
-          const { data: publishedRelease } = await github.rest.repos.updateRelease({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            release_id: draftRelease.id,
-            draft: false,
-          });
-          return {
-            upload_url: publishedRelease.upload_url,
-            html_url: publishedRelease.html_url,
-            tag_name: publishedRelease.tag_name,
-            name: publishedRelease.name,
-            body: publishedRelease.body,
-          };
+                const { data: releases } = await github.rest.repos.listReleases({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                });
+                const draftRelease = releases.find(release => release.draft === true);
+                if (!draftRelease) {
+                  throw new Error("No draft release found");
+                }
+                const { data: publishedRelease } = await github.rest.repos.updateRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: draftRelease.id,
+                  draft: false,
+                });
+                core.setOutput("body", publishedRelease.body);
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       id: publish_release
@@ -69,4 +63,4 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"${{ steps.publish_release.outputs.body }}"}' $SLACK_WEBHOOK_URL
+        curl -X POST -H 'Content-type: application/json' --data '{"text":"'"${{ steps.publish_release.outputs.body }}"'"}' $SLACK_WEBHOOK_URL

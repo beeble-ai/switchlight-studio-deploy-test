@@ -63,4 +63,6 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST -H 'Content-type: application/json' --data '{"text":"${{ steps.publish_release.outputs.body }}"}' $SLACK_WEBHOOK_URL
+        RELEASE_NOTES="${{ steps.publish_release.outputs.body }}"
+        PAYLOAD=$(echo "$RELEASE_NOTES" | jq -R -s '{text: .}')
+        curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" $SLACK_WEBHOOK_URL

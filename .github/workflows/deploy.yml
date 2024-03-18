@@ -39,13 +39,24 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       id: publish_release
 
-    - name: Download Release Asset (.zip)
+    - name: Download Release Assets
       run: |
-        ASSET_URL=$(curl -s \
+        # Fetch all release assets URLs
+        ASSETS_URLS=$(curl -s \
           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.publish_release.outputs.tag_name }} | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
-        curl -L -o release.zip $ASSET_URL
+          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.publish_release.outputs.tag_name }} | jq -r '.assets[] | .browser_download_url' | grep -E '\.(exe|deb|rpm)$')
+    
+        # Download each asset
+        echo "$ASSETS_URLS" | while read url; do
+          if [[ $url =~ \.exe$ ]]; then
+            curl -L -o "${{ github.workspace }}/asset.exe" "$url"
+          elif [[ $url =~ \.deb$ ]]; then
+            curl -L -o "${{ github.workspace }}/asset.deb" "$url"
+          elif [[ $url =~ \.rpm$ ]]; then
+            curl -L -o "${{ github.workspace }}/asset.rpm" "$url"
+          fi
+        done
 
     - name: Upload Release Asset to AWS S3
       uses: jakejarvis/s3-sync-action@master
@@ -56,8 +67,8 @@ jobs:
         AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: 'us-west-2'  # Your AWS region
-        DEST_DIR: 'path/to/your/s3/directory'  # If you want to specify a directory in S3
+        AWS_REGION: 'us-west-2'
+        DEST_DIR: 'basic/development/windows/download'  # If you want to specify a directory in S3
 
     - name: Send Release Note to Slack
       uses: 8398a7/action-slack@v3

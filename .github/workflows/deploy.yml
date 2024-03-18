@@ -51,7 +51,12 @@ jobs:
       run: |
         for file in ${{ github.workspace }}/*.{exe,deb,rpm}; do
           if [ -f "$file" ]; then
-            aws s3 cp "$file" "s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/windows/download/${file##*/}"
+            if [[ "$file" == *.exe ]]; then
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/windows/download/${file##*/}"
+            elif [[ "$file" == *.deb ]] || [[ "$file" == *.rpm ]]; then
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/linux/download/${file##*/}"
+            fi
+            aws s3 cp "$file" "$s3_path"
           fi
         done
       env:
@@ -63,6 +68,5 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        RELEASE_NOTES="${{ steps.publish_release.outputs.body }}"
-        PAYLOAD=$(echo "Electron Production deployed $RELEASE_NOTES" | jq -R -s '{text: .}')
+        PAYLOAD=$(echo "Electron Production deployed Successfully" | jq -R -s '{text: .}')
         curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" $SLACK_WEBHOOK_URL

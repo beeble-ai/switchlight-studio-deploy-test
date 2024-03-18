@@ -55,6 +55,12 @@ jobs:
 
     - name: Upload Release Asset to AWS S3
       uses: jakejarvis/s3-sync-action@master
+      with:
+        args: >
+          --exclude "*" 
+          --include "*.exe" 
+          --include "*.rpm" 
+          --include "*.deb" 
       env:
         SOURCE_DIR: './'
         AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}

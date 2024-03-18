@@ -1,13 +1,13 @@
-name: Publish Draft Release and Upload to S3
+name: Publish Release, Upload to S3, and Notify Slack
 
 on:
   workflow_dispatch:
 
 jobs:
-  publish-and-upload:
+  release-and-notify:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v2
 
     - name: Publish Latest Draft Release
@@ -18,37 +18,53 @@ jobs:
             owner: context.repo.owner,
             repo: context.repo.repo,
           });
-          const draftRelease = releases.find(release => release.draft === true);
+          const draftRelease = releases.find(release => release.draft);
           if (!draftRelease) {
             throw new Error("No draft release found");
           }
-          const { data: updatedRelease } = await github.rest.repos.updateRelease({
+          const { data: publishedRelease } = await github.rest.repos.updateRelease({
             owner: context.repo.owner,
             repo: context.repo.repo,
             release_id: draftRelease.id,
             draft: false,
           });
-          core.setOutput("release-notes", updatedRelease.body);
-          core.setOutput("tag-name", updatedRelease.tag_name);
-      id: publish
+          return {
+            upload_url: publishedRelease.upload_url,
+            html_url: publishedRelease.html_url,
+            tag_name: publishedRelease.tag_name,
+            name: publishedRelease.name,
+            body: publishedRelease.body,
+          };
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      id: publish_release
+
+    - name: Download Release Asset (.zip)
+      run: |
+        ASSET_URL=$(curl -s \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.publish_release.outputs.tag_name }} | jq -r '.assets[] | select(.name | endswith(".zip")) | .browser_download_url')
+        curl -L -o release.zip $ASSET_URL
 
     - name: Upload Release Asset to AWS S3
       uses: jakejarvis/s3-sync-action@master
       with:
         args: --acl public-read
       env:
-        SOURCE_DIR: './path-to-your-assets'  # Set this to the directory where your release assets are located
+        SOURCE_DIR: './'
         AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: 'us-east-1'  # Example region
+        AWS_REGION: 'us-west-2'  # Your AWS region
+        DEST_DIR: 'path/to/your/s3/directory'  # If you want to specify a directory in S3
 
     - name: Send Release Note to Slack
       uses: 8398a7/action-slack@v3
       with:
         status: ${{ job.status }}
-        fields: repo,message,commit,author,action,eventName,ref,workflow,job,took  # Customize this as per your requirement
-        text: ${{ steps.publish.outputs.release-notes }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+        text: ${{ steps.release.outputs.body }}
         author_name: Release Automation Bot
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

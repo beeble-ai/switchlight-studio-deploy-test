@@ -64,5 +64,5 @@ jobs:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
         RELEASE_NOTES="${{ steps.publish_release.outputs.body }}"
-        PAYLOAD=$(echo "Electron Prod. Release\n$RELEASE_NOTES" | jq -R -s '{text: .}')
+        PAYLOAD=$(echo "Electron Prod. Release $RELEASE_NOTES" | jq -R -s '{text: .}')
         curl -X POST -H 'Content-type: application/json' --data "$PAYLOAD" $SLACK_WEBHOOK_URL

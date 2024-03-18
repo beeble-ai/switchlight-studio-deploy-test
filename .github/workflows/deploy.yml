@@ -1,0 +1,54 @@
+name: Publish Draft Release and Upload to S3
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Publish Latest Draft Release
+      uses: actions/github-script@v5
+      with:
+        script: |
+          const { data: releases } = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+          });
+          const draftRelease = releases.find(release => release.draft === true);
+          if (!draftRelease) {
+            throw new Error("No draft release found");
+          }
+          const { data: updatedRelease } = await github.rest.repos.updateRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: draftRelease.id,
+            draft: false,
+          });
+          core.setOutput("release-notes", updatedRelease.body);
+          core.setOutput("tag-name", updatedRelease.tag_name);
+      id: publish
+
+    - name: Upload Release Asset to AWS S3
+      uses: jakejarvis/s3-sync-action@master
+      with:
+        args: --acl public-read
+      env:
+        SOURCE_DIR: './path-to-your-assets'  # Set this to the directory where your release assets are located
+        AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'  # Example region
+
+    - name: Send Release Note to Slack
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow,job,took  # Customize this as per your requirement
+        text: ${{ steps.publish.outputs.release-notes }}
+        author_name: Release Automation Bot
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

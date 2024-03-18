@@ -45,7 +45,7 @@ jobs:
         ASSETS_URLS=$(curl -s \
           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.publish_release.outputs.tag_name }} | jq -r '.assets[] | .browser_download_url' | grep -E '\.(exe|deb|rpm)$')
+          https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.assets[] | .browser_download_url' | grep -E '\.(exe|deb|rpm)$')
     
         # Download each asset
         echo "$ASSETS_URLS" | while read url; do

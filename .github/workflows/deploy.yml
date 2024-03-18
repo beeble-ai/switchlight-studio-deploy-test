@@ -53,21 +53,17 @@ jobs:
           curl -L -o "${{ github.workspace }}/${filename}" "$url"
         done
 
-    - name: Upload Release Asset to AWS S3
-      uses: jakejarvis/s3-sync-action@master
-      with:
-        args: >
-          --exclude "*" 
-          --include "*.exe" 
-          --include "*.rpm" 
-          --include "*.deb" 
+    - name: Upload Assets to AWS S3
+      run: |
+        for file in ${{ github.workspace }}/*.{exe,deb,rpm}; do
+          if [ -f "$file" ]; then
+            aws s3 cp "$file" "s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/windows/download/${file##*/}"
+          fi
+        done
       env:
-        SOURCE_DIR: './'
-        AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: 'us-west-2'
-        DEST_DIR: 'basic/development/windows/download'  # If you want to specify a directory in S3
 
     - name: Send Release Note to Slack
       uses: 8398a7/action-slack@v3

@@ -55,9 +55,9 @@ jobs:
           file="/data/deploy/${filename}"
           if [ -f "$file" ]; then
             if [[ "$file" == *.exe ]]; then
-              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/production/windows/download/${filename}"
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/pro/production/windows/download/${filename}"
             elif [[ "$file" == *.deb ]] || [[ "$file" == *.rpm ]]; then
-              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/production/linux/download/${filename}"
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/pro/production/linux/download/${filename}"
             fi
             aws s3 cp "$file" "$s3_path"
           fi

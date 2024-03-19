@@ -33,32 +33,35 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       id: publish_release
 
-    - name: Download Release Assets (.exe, .deb, .rpm)
+    - name: Download Release Assets (.exe, .deb, .rpm) and Track Them
       run: |
-        # Fetch all release assets URLs
+        mkdir -p /data/deploy
+        # Clear or create the downloaded_files.txt file
+        > /data/deploy/downloaded_files.txt
+        
         ASSETS_URLS=$(curl -s \
           -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.assets[] | .browser_download_url' | grep -E '\.(exe|deb|rpm)$')
-    
-        # Download each asset
+        
         echo "$ASSETS_URLS" | while read url; do
           filename=$(basename "$url")
-          curl -L -o "${{ github.workspace }}/${filename}" "$url"
+          curl -L -o "/data/deploy/${filename}" "$url" && echo "${filename}" >> /data/deploy/downloaded_files.txt
         done
 
-    - name: Upload Assets to AWS S3
+    - name: Upload Downloaded Assets to AWS S3
       run: |
-        for file in ${{ github.workspace }}/*.{exe,deb,rpm}; do
+        while read filename; do
+          file="/data/deploy/${filename}"
           if [ -f "$file" ]; then
             if [[ "$file" == *.exe ]]; then
-              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/windows/download/${file##*/}"
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/production/windows/download/${filename}"
             elif [[ "$file" == *.deb ]] || [[ "$file" == *.rpm ]]; then
-              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/development/linux/download/${file##*/}"
+              s3_path="s3://${{ secrets.S3_BUCKET_NAME }}/basic/production/linux/download/${filename}"
             fi
             aws s3 cp "$file" "$s3_path"
           fi
-        done
+        done < /data/deploy/downloaded_files.txt
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
